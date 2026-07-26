@@ -82,6 +82,8 @@ interface MeetingState {
   activeLayoutId: string
   /** pods force-closed by the local user, per layout */
   closedPods: Record<string, PodKind[]>
+  /** pod shown inside the bottom drawer on narrow screens */
+  drawerPod: PodKind | null
 
   // ---- people ----
   participants: Participant[]
@@ -119,6 +121,8 @@ interface MeetingState {
   setLayoutMain: (id: string, pod: PodKind) => void
   togglePod: (pod: PodKind) => void
   isPodOpen: (pod: PodKind) => boolean
+  openDrawerPod: (pod: PodKind) => void
+  closeDrawerPod: () => void
 
   toggleMic: () => void
   toggleCam: () => void
@@ -184,6 +188,7 @@ export const useMeetingStore = create<MeetingState>()((set, get) => ({
   layouts: DEFAULT_LAYOUTS,
   activeLayoutId: "sharing",
   closedPods: {},
+  drawerPod: null,
 
   participants: [],
 
@@ -244,6 +249,7 @@ export const useMeetingStore = create<MeetingState>()((set, get) => ({
       activeLayoutId: initialLayout,
       layouts: DEFAULT_LAYOUTS,
       closedPods: {},
+      drawerPod: null,
       micOn: false,
       camOn: false,
       screenSharing: false,
@@ -288,6 +294,7 @@ export const useMeetingStore = create<MeetingState>()((set, get) => ({
     screenStream?.getTracks().forEach((t) => t.stop())
     set({
       roomId: null,
+      drawerPod: null,
       participants: [],
       cameraStream: null,
       screenStream: null,
@@ -304,7 +311,7 @@ export const useMeetingStore = create<MeetingState>()((set, get) => ({
   },
 
   // ---- layout ----
-  setActiveLayout: (activeLayoutId) => set({ activeLayoutId }),
+  setActiveLayout: (activeLayoutId) => set({ activeLayoutId, drawerPod: null }),
 
   addLayout: (name) => {
     const id = `custom-${Date.now().toString(36)}`
@@ -371,6 +378,25 @@ export const useMeetingStore = create<MeetingState>()((set, get) => ({
     if (!inLayout) return false
     return !(s.closedPods[layout.id] ?? []).includes(pod)
   },
+
+  openDrawerPod: (pod) =>
+    set((s) => {
+      const layout = s.layouts.find((l) => l.id === s.activeLayoutId)
+      // Make sure the pod belongs to the layout so desktop keeps it after resize.
+      const inLayout = !layout || layout.main === pod || layout.side.includes(pod)
+      return {
+        drawerPod: pod,
+        layouts: inLayout
+          ? s.layouts
+          : s.layouts.map((l) => (l.id === layout.id ? { ...l, side: [...l.side, pod] } : l)),
+        closedPods:
+          layout && (s.closedPods[layout.id] ?? []).includes(pod)
+            ? { ...s.closedPods, [layout.id]: s.closedPods[layout.id].filter((p) => p !== pod) }
+            : s.closedPods,
+      }
+    }),
+
+  closeDrawerPod: () => set({ drawerPod: null }),
 
   // ---- media ----
   toggleMic: () =>

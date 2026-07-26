@@ -433,6 +433,73 @@
     margin-top: 10px;
   }
 
+  /* ---- Narrow screens: single stage + drawer pods ---- */
+  .room-body--compact {
+    padding: 8px;
+  }
+
+  .room-header--compact {
+    gap: 8px;
+    padding: 0 8px;
+  }
+
+  .toolbar--compact {
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+    flex-wrap: nowrap;
+  }
+
+  .pod-menu-item {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .pod-drawer .ant-drawer-body {
+    padding: 0;
+  }
+
+  .pod-drawer .ant-drawer-body > .pod {
+    flex: 1 1 auto;
+    border: none;
+    border-radius: 0;
+  }
+
+  .pod-drawer .ant-drawer-content {
+    background: var(--app-surface);
+    border-top: 1px solid var(--app-border);
+    border-radius: 12px 12px 0 0;
+  }
+
+  @media (max-width: 899px) {
+    .room-header {
+      gap: 8px;
+    }
+
+    .room-ident {
+      flex: 1 1 auto;
+    }
+
+    .room-header-center {
+      flex: none;
+      overflow: visible;
+    }
+
+    .rail-slot {
+      min-height: 0;
+    }
+  }
+
+  @media (max-width: 600px) {
+    .room-title {
+      font-size: 12.5px;
+    }
+
+    .room-body--compact {
+      padding: 6px;
+    }
+  }
+
   .lobby {
     height: 100%;
     overflow-y: auto;

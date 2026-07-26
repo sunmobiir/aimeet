@@ -17,7 +17,10 @@ import {
   ApartmentOutlined,
   CopyOutlined,
   DeleteOutlined,
+  DownOutlined,
   LockOutlined,
+  LogoutOutlined,
+  MoreOutlined,
   PlusOutlined,
   SignalFilled,
   UnlockOutlined,
@@ -25,6 +28,7 @@ import {
 import { useMeetingStore } from "@/store/useMeetingStore"
 import { elapsed } from "@/lib/format"
 import { ALL_PODS, POD_META } from "@/components/pods/registry"
+import { useIsMobile } from "@/hooks/useIsMobile"
 import type { PodKind } from "@/types"
 
 const { Text } = Typography
@@ -54,6 +58,7 @@ export default function RoomHeader({ onLeave }: { onLeave: () => void }) {
 
   const isHost = self?.role === "host"
   const activeLayout = layouts.find((l) => l.id === activeLayoutId)
+  const isMobile = useIsMobile()
 
   const [now, setNow] = useState(Date.now())
   const [layoutModal, setLayoutModal] = useState(false)
@@ -72,8 +77,61 @@ export default function RoomHeader({ onLeave }: { onLeave: () => void }) {
     )
   }
 
+  function confirmLeave() {
+    Modal.confirm({
+      title: "Leave this meeting?",
+      okText: "Leave",
+      okButtonProps: { danger: true },
+      onOk: onLeave,
+    })
+  }
+
+  // Narrow screens fold the host controls into a single overflow menu.
+  const moreItems: NonNullable<React.ComponentProps<typeof Dropdown>["menu"]>["items"] = [
+    { key: "invite", icon: <CopyOutlined />, label: `Copy invite · ${roomCode}` },
+    ...(isHost
+      ? [
+          {
+            key: "lock",
+            icon: locked ? <LockOutlined /> : <UnlockOutlined />,
+            label: locked ? "Unlock room" : "Lock room",
+          },
+          { type: "divider" as const },
+          {
+            key: "stage",
+            icon: <ApartmentOutlined />,
+            label: "Main stage pod",
+            children: ALL_PODS.map((p) => ({
+              key: `stage:${p}`,
+              icon: POD_META[p].icon,
+              label: POD_META[p].label,
+              disabled: activeLayout?.main === p,
+            })),
+          },
+          { key: "new-layout", icon: <PlusOutlined />, label: "New layout" },
+          ...(layouts.length > 1
+            ? [{ key: "del-layout", icon: <DeleteOutlined />, label: "Delete layout", danger: true }]
+            : []),
+        ]
+      : []),
+  ]
+
+  function onMoreClick({ key }: { key: string }) {
+    if (key === "invite") return copyInvite()
+    if (key === "lock") return toggleLock()
+    if (key === "new-layout") {
+      setLayoutName("")
+      setLayoutModal(true)
+      return
+    }
+    if (key === "del-layout") return removeLayout(activeLayoutId)
+    if (key.startsWith("stage:") && activeLayout) {
+      setLayoutMain(activeLayout.id, key.slice("stage:".length) as PodKind)
+    }
+  }
+
   return (
-    <header className="room-header">
+    <header className={isMobile ? "room-header room-header--compact" : "room-header"}>
       <div className="room-ident">
         <span className="brand-dot" aria-hidden="true" />
         <div style={{ minWidth: 0 }}>
@@ -96,69 +154,92 @@ export default function RoomHeader({ onLeave }: { onLeave: () => void }) {
       </div>
 
       <div className="room-header-center">
-        <Segmented
-          size="small"
-          value={activeLayoutId}
-          onChange={(v) => setActiveLayout(String(v))}
-          options={layouts.map((l) => ({ label: l.name, value: l.id }))}
-        />
-        {isHost && (
-          <Space size={2}>
-            <Tooltip title="Choose the main stage pod">
-              <Dropdown
-                trigger={["click"]}
-                menu={{
-                  selectable: true,
-                  selectedKeys: activeLayout ? [activeLayout.main] : [],
-                  items: ALL_PODS.map((p) => ({
-                    key: p,
-                    icon: POD_META[p].icon,
-                    label: POD_META[p].label,
-                  })),
-                  onClick: ({ key }) => {
-                    if (activeLayout) setLayoutMain(activeLayout.id, key as PodKind)
-                  },
-                }}
-              >
-                <Button
-                  type="text"
-                  size="small"
-                  aria-label="Choose main stage pod"
-                  icon={<ApartmentOutlined style={{ fontSize: 12 }} />}
-                />
-              </Dropdown>
-            </Tooltip>
-            <Tooltip title="New layout">
-              <Button
-                type="text"
-                size="small"
-                aria-label="Create layout"
-                icon={<PlusOutlined style={{ fontSize: 12 }} />}
-                onClick={() => {
-                  setLayoutName("")
-                  setLayoutModal(true)
-                }}
-              />
-            </Tooltip>
-            {layouts.length > 1 && (
-              <Popconfirm
-                title="Delete this layout?"
-                okText="Delete"
-                okButtonProps={{ danger: true, size: "small" }}
-                cancelButtonProps={{ size: "small" }}
-                onConfirm={() => removeLayout(activeLayoutId)}
-              >
-                <Tooltip title="Delete layout">
+        {isMobile ? (
+          <Dropdown
+            trigger={["click"]}
+            menu={{
+              selectable: true,
+              selectedKeys: [activeLayoutId],
+              items: layouts.map((l) => ({ key: l.id, label: l.name })),
+              onClick: ({ key }) => setActiveLayout(key),
+            }}
+          >
+            <Button size="small" aria-label="Switch layout">
+              <Space size={6}>
+                <span className="truncate" style={{ maxWidth: 110 }}>
+                  {activeLayout?.name ?? "Layout"}
+                </span>
+                <DownOutlined style={{ fontSize: 10 }} />
+              </Space>
+            </Button>
+          </Dropdown>
+        ) : (
+          <>
+            <Segmented
+              size="small"
+              value={activeLayoutId}
+              onChange={(v) => setActiveLayout(String(v))}
+              options={layouts.map((l) => ({ label: l.name, value: l.id }))}
+            />
+            {isHost && (
+              <Space size={2}>
+                <Tooltip title="Choose the main stage pod">
+                  <Dropdown
+                    trigger={["click"]}
+                    menu={{
+                      selectable: true,
+                      selectedKeys: activeLayout ? [activeLayout.main] : [],
+                      items: ALL_PODS.map((p) => ({
+                        key: p,
+                        icon: POD_META[p].icon,
+                        label: POD_META[p].label,
+                      })),
+                      onClick: ({ key }) => {
+                        if (activeLayout) setLayoutMain(activeLayout.id, key as PodKind)
+                      },
+                    }}
+                  >
+                    <Button
+                      type="text"
+                      size="small"
+                      aria-label="Choose main stage pod"
+                      icon={<ApartmentOutlined style={{ fontSize: 12 }} />}
+                    />
+                  </Dropdown>
+                </Tooltip>
+                <Tooltip title="New layout">
                   <Button
                     type="text"
                     size="small"
-                    aria-label="Delete layout"
-                    icon={<DeleteOutlined style={{ fontSize: 12 }} />}
+                    aria-label="Create layout"
+                    icon={<PlusOutlined style={{ fontSize: 12 }} />}
+                    onClick={() => {
+                      setLayoutName("")
+                      setLayoutModal(true)
+                    }}
                   />
                 </Tooltip>
-              </Popconfirm>
+                {layouts.length > 1 && (
+                  <Popconfirm
+                    title="Delete this layout?"
+                    okText="Delete"
+                    okButtonProps={{ danger: true, size: "small" }}
+                    cancelButtonProps={{ size: "small" }}
+                    onConfirm={() => removeLayout(activeLayoutId)}
+                  >
+                    <Tooltip title="Delete layout">
+                      <Button
+                        type="text"
+                        size="small"
+                        aria-label="Delete layout"
+                        icon={<DeleteOutlined style={{ fontSize: 12 }} />}
+                      />
+                    </Tooltip>
+                  </Popconfirm>
+                )}
+              </Space>
             )}
-          </Space>
+          </>
         )}
       </div>
 
@@ -167,15 +248,33 @@ export default function RoomHeader({ onLeave }: { onLeave: () => void }) {
           <Badge
             color={CONNECTION_COLOR[connection]}
             text={
-              <Text style={{ fontSize: 11, color: "var(--app-text-dim)", textTransform: "capitalize" }}>
-                <SignalFilled style={{ marginInlineEnd: 4, fontSize: 10 }} />
-                {connection}
-              </Text>
+              isMobile ? null : (
+                <Text style={{ fontSize: 11, color: "var(--app-text-dim)", textTransform: "capitalize" }}>
+                  <SignalFilled style={{ marginInlineEnd: 4, fontSize: 10 }} />
+                  {connection}
+                </Text>
+              )
             }
           />
         </Tooltip>
 
-        {isHost && (
+        {isMobile && (
+          <>
+            <Dropdown trigger={["click"]} placement="bottomRight" menu={{ items: moreItems, onClick: onMoreClick }}>
+              <Button size="small" aria-label="More meeting options" icon={<MoreOutlined />} />
+            </Dropdown>
+            <Button
+              size="small"
+              danger
+              type="primary"
+              aria-label="Leave meeting"
+              icon={<LogoutOutlined />}
+              onClick={confirmLeave}
+            />
+          </>
+        )}
+
+        {!isMobile && isHost && (
           <Tooltip title={locked ? "Room is locked — unlock to admit others" : "Lock the room"}>
             <Button
               size="small"
@@ -189,23 +288,27 @@ export default function RoomHeader({ onLeave }: { onLeave: () => void }) {
           </Tooltip>
         )}
 
-        <Tooltip title={`Room code ${roomCode}`}>
-          <Button size="small" icon={<CopyOutlined />} onClick={copyInvite}>
-            Invite
-          </Button>
-        </Tooltip>
+        {!isMobile && (
+          <>
+            <Tooltip title={`Room code ${roomCode}`}>
+              <Button size="small" icon={<CopyOutlined />} onClick={copyInvite}>
+                Invite
+              </Button>
+            </Tooltip>
 
-        <Popconfirm
-          title="Leave this meeting?"
-          okText="Leave"
-          okButtonProps={{ danger: true, size: "small" }}
-          cancelButtonProps={{ size: "small" }}
-          onConfirm={onLeave}
-        >
-          <Button size="small" danger type="primary">
-            Leave
-          </Button>
-        </Popconfirm>
+            <Popconfirm
+              title="Leave this meeting?"
+              okText="Leave"
+              okButtonProps={{ danger: true, size: "small" }}
+              cancelButtonProps={{ size: "small" }}
+              onConfirm={onLeave}
+            >
+              <Button size="small" danger type="primary">
+                Leave
+              </Button>
+            </Popconfirm>
+          </>
+        )}
       </div>
 
       <Modal

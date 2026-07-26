@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
-import { Alert } from "antd"
+import { Alert, Drawer } from "antd"
 import RoomHeader from "@/components/RoomHeader"
 import MeetingToolbar from "@/components/MeetingToolbar"
-import { renderPod } from "@/components/pods/registry"
+import { POD_META, renderPod } from "@/components/pods/registry"
+import { useIsMobile } from "@/hooks/useIsMobile"
 import { useMeetingStore } from "@/store/useMeetingStore"
 import { useSessionStore } from "@/store/useSessionStore"
 import { startSimulation } from "@/lib/simulation"
@@ -26,7 +27,10 @@ export default function RoomPage() {
   const togglePod = useMeetingStore((s) => s.togglePod)
   const mediaError = useMeetingStore((s) => s.mediaError)
   const setMediaError = useMeetingStore((s) => s.setMediaError)
+  const drawerPod = useMeetingStore((s) => s.drawerPod)
+  const closeDrawerPod = useMeetingStore((s) => s.closeDrawerPod)
 
+  const isMobile = useIsMobile()
   const room = rooms.find((r) => r.id === roomId)
   const splitRef = useRef<HTMLDivElement | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -88,6 +92,11 @@ export default function RoomPage() {
     }
   }, [dragging, onDragMove])
 
+  // Leaving the narrow layout hands the pods back to the side rail.
+  useEffect(() => {
+    if (!isMobile && drawerPod) closeDrawerPod()
+  }, [isMobile, drawerPod, closeDrawerPod])
+
   if (!room || !activeRoomId || !layout) return null
 
   return (
@@ -110,12 +119,12 @@ export default function RoomPage() {
         />
       )}
 
-      <div className="room-body" ref={splitRef}>
-        <div className="stage-col" style={{ width: `${mainSize}%` }}>
+      <div className={isMobile ? "room-body room-body--compact" : "room-body"} ref={splitRef}>
+        <div className="stage-col" style={{ width: isMobile ? "100%" : `${mainSize}%` }}>
           {renderPod(layout.main)}
         </div>
 
-        {hasSide && (
+        {!isMobile && hasSide && (
           <>
             <div
               className={dragging ? "splitter splitter--active" : "splitter"}
@@ -144,6 +153,21 @@ export default function RoomPage() {
       </div>
 
       <MeetingToolbar />
+
+      <Drawer
+        placement="bottom"
+        height="78%"
+        open={isMobile && !!drawerPod}
+        onClose={closeDrawerPod}
+        closable={false}
+        className="pod-drawer"
+        title={null}
+        styles={{ header: { display: "none" }, body: { padding: 0, display: "flex" } }}
+        aria-label={drawerPod ? `${POD_META[drawerPod].label} pod` : undefined}
+        destroyOnHidden
+      >
+        {drawerPod && renderPod(drawerPod, closeDrawerPod)}
+      </Drawer>
     </div>
   )
 }
