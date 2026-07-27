@@ -96,6 +96,8 @@ export interface Layout {
   side: PodKind[]
   /** percentage width of the main stage */
   mainSize: number
+  /** flex-grow weight per side pod, set by dragging the splitters between pods */
+  sideSizes?: Partial<Record<PodKind, number>>
 }
 
 export interface Room {
