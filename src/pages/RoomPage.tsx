@@ -3,13 +3,17 @@ import { useNavigate, useParams } from "react-router-dom"
 import { Alert, Drawer } from "antd"
 import RoomHeader from "@/components/RoomHeader"
 import MeetingToolbar from "@/components/MeetingToolbar"
-import PodRail from "@/components/PodRail"
+import PodRail, { TWO_COLUMN_MIN_PODS } from "@/components/PodRail"
 import Splitter from "@/components/Splitter"
 import { POD_META, renderPod } from "@/components/pods/registry"
 import { useIsMobile } from "@/hooks/useIsMobile"
+import { useIsWideScreen } from "@/hooks/useIsWideScreen"
 import { useMeetingStore } from "@/store/useMeetingStore"
 import { useSessionStore } from "@/store/useSessionStore"
 import { startSimulation } from "@/lib/simulation"
+
+/** Widest the stage may stay once the rail switches to two columns, in percent. */
+const MAX_MAIN_TWO_COL = 58
 
 export default function RoomPage() {
   const { roomId = "" } = useParams()
@@ -32,6 +36,7 @@ export default function RoomPage() {
   const closeDrawerPod = useMeetingStore((s) => s.closeDrawerPod)
 
   const isMobile = useIsMobile()
+  const isWide = useIsWideScreen()
   const room = rooms.find((r) => r.id === roomId)
   const splitRef = useRef<HTMLDivElement | null>(null)
   /** main-stage percentage captured when a splitter drag begins */
@@ -66,6 +71,16 @@ export default function RoomPage() {
   const sidePods = layout ? layout.side.filter((p) => !closed.includes(p)) : []
   const hasSide = sidePods.length > 0
   const mainSize = hasSide ? (layout?.mainSize ?? 72) : 100
+  // Wide screens with a crowded rail stack the pods in two columns instead of one tall strip.
+  const twoColumn = !isMobile && isWide && sidePods.length >= TWO_COLUMN_MIN_PODS
+
+  // Two columns need a wider rail, so shrink an oversized stage once on entering that mode.
+  useEffect(() => {
+    if (twoColumn && layout && layout.mainSize > MAX_MAIN_TWO_COL) {
+      setLayoutMainSize(layout.id, MAX_MAIN_TWO_COL)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [twoColumn])
 
   // Leaving the narrow layout hands the pods back to the side rail.
   useEffect(() => {
@@ -117,7 +132,12 @@ export default function RoomPage() {
                 setLayoutMainSize(layout.id, Math.min(82, Math.max(38, mainSize + dir * 2)))
               }
             />
-            <PodRail layout={layout} pods={sidePods} width={`calc(${100 - mainSize}% - 6px)`} />
+            <PodRail
+              layout={layout}
+              pods={sidePods}
+              width={`calc(${100 - mainSize}% - 6px)`}
+              twoColumn={twoColumn}
+            />
           </>
         )}
       </div>
