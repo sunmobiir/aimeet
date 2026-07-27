@@ -1,83 +1,58 @@
-import { Fragment, useRef } from "react"
+import { useRef } from "react"
+import PodColumn from "@/components/PodColumn"
 import Splitter from "@/components/Splitter"
-import { POD_META, renderPod } from "@/components/pods/registry"
 import { useMeetingStore } from "@/store/useMeetingStore"
 import type { Layout, PodKind } from "@/types"
 
-/** smallest a side pod may become while dragging, in px */
-const MIN_POD = 96
-/** px moved per keyboard nudge */
-const KEY_STEP = 24
+/** Above this many open side pods a wide screen splits the rail into two columns. */
+export const TWO_COLUMN_MIN_PODS = 4
 
 interface PodRailProps {
   layout: Layout
   pods: PodKind[]
   width: string
+  /** true when the viewport is wide enough for a second rail column */
+  twoColumn: boolean
 }
 
-export default function PodRail({ layout, pods, width }: PodRailProps) {
-  const togglePod = useMeetingStore((s) => s.togglePod)
-  const setLayoutSideSizes = useMeetingStore((s) => s.setLayoutSideSizes)
-  const resetLayoutSideSizes = useMeetingStore((s) => s.resetLayoutSideSizes)
+export default function PodRail({ layout, pods, width, twoColumn }: PodRailProps) {
+  const setLayoutSideColumnSize = useMeetingStore((s) => s.setLayoutSideColumnSize)
 
-  const slots = useRef(new Map<PodKind, HTMLDivElement>())
-  // Pixel heights + flex weights of the two pods touching the active splitter.
-  const drag = useRef<{ a: PodKind; b: PodKind; heightA: number; total: number; weight: number } | null>(null)
+  const railRef = useRef<HTMLDivElement | null>(null)
+  /** first-column percentage captured when the column splitter drag begins */
+  const colStart = useRef(50)
 
-  const weightOf = (pod: PodKind) => layout.sideSizes?.[pod] ?? 1
+  const colSize = layout.sideColumnSize ?? 50
 
-  const begin = (a: PodKind, b: PodKind) => {
-    const elA = slots.current.get(a)
-    const elB = slots.current.get(b)
-    if (!elA || !elB) return
-    drag.current = {
-      a,
-      b,
-      heightA: elA.offsetHeight,
-      total: elA.offsetHeight + elB.offsetHeight,
-      weight: weightOf(a) + weightOf(b),
-    }
+  if (!twoColumn) {
+    return (
+      <div className="rail" style={{ width }} ref={railRef}>
+        <PodColumn layout={layout} pods={pods} />
+      </div>
+    )
   }
 
-  const applyDelta = (delta: number) => {
-    const d = drag.current
-    if (!d || d.total <= MIN_POD * 2) return
-    const heightA = Math.min(d.total - MIN_POD, Math.max(MIN_POD, d.heightA + delta))
-    setLayoutSideSizes(layout.id, {
-      [d.a]: (heightA / d.total) * d.weight,
-      [d.b]: ((d.total - heightA) / d.total) * d.weight,
-    })
-  }
+  // Fill the left column first so an odd pod count leaves the extra pod on the left.
+  const split = Math.ceil(pods.length / 2)
 
   return (
-    <div className="rail" style={{ width }}>
-      {pods.map((pod, i) => (
-        <Fragment key={pod}>
-          {i > 0 && (
-            <Splitter
-              orientation="horizontal"
-              label={`Resize ${POD_META[pods[i - 1]].label} and ${POD_META[pod].label} pods`}
-              onStart={() => begin(pods[i - 1], pod)}
-              onMove={applyDelta}
-              onEnd={() => {
-                drag.current = null
-              }}
-              onKeyStep={(dir) => applyDelta(dir * KEY_STEP)}
-              onDoubleClick={() => resetLayoutSideSizes(layout.id)}
-            />
-          )}
-          <div
-            className="rail-slot"
-            style={{ flexGrow: weightOf(pod) }}
-            ref={(el) => {
-              if (el) slots.current.set(pod, el)
-              else slots.current.delete(pod)
-            }}
-          >
-            {renderPod(pod, () => togglePod(pod))}
-          </div>
-        </Fragment>
-      ))}
+    <div className="rail rail--two-col" style={{ width }} ref={railRef}>
+      <PodColumn layout={layout} pods={pods.slice(0, split)} width={`calc(${colSize}% - 6px)`} />
+      <Splitter
+        orientation="vertical"
+        label="Resize pod columns"
+        onStart={() => {
+          colStart.current = colSize
+        }}
+        onMove={(delta) => {
+          const rect = railRef.current?.getBoundingClientRect()
+          if (!rect) return
+          setLayoutSideColumnSize(layout.id, colStart.current + (delta / rect.width) * 100)
+        }}
+        onKeyStep={(dir) => setLayoutSideColumnSize(layout.id, colSize + dir * 2)}
+        onDoubleClick={() => setLayoutSideColumnSize(layout.id, 50)}
+      />
+      <PodColumn layout={layout} pods={pods.slice(split)} width={`calc(${100 - colSize}% - 6px)`} />
     </div>
   )
 }

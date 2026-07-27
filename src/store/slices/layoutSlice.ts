@@ -49,6 +49,8 @@ export interface LayoutSlice {
   setLayoutSideSizes: (id: string, sizes: Partial<Record<PodKind, number>>) => void
   /** drop custom weights so the side pods share the rail evenly again */
   resetLayoutSideSizes: (id: string) => void
+  /** percentage width of the first rail column in two-column mode */
+  setLayoutSideColumnSize: (id: string, size: number) => void
   setLayoutMain: (id: string, pod: PodKind) => void
   togglePod: (pod: PodKind) => void
   isPodOpen: (pod: PodKind) => boolean
@@ -117,7 +119,14 @@ export const createLayoutSlice: StateCreator<MeetingState, [], [], LayoutSlice> 
 
   resetLayoutSideSizes: (id) =>
     set((s) => ({
-      layouts: s.layouts.map((l) => (l.id === id ? { ...l, sideSizes: {} } : l)),
+      layouts: s.layouts.map((l) => (l.id === id ? { ...l, sideSizes: {}, sideColumnSize: undefined } : l)),
+    })),
+
+  setLayoutSideColumnSize: (id, size) =>
+    set((s) => ({
+      layouts: s.layouts.map((l) =>
+        l.id === id ? { ...l, sideColumnSize: Math.min(75, Math.max(25, Math.round(size))) } : l,
+      ),
     })),
 
   setLayoutMain: (id, pod) =>

@@ -98,6 +98,8 @@ export interface Layout {
   mainSize: number
   /** flex-grow weight per side pod, set by dragging the splitters between pods */
   sideSizes?: Partial<Record<PodKind, number>>
+  /** percentage width of the first rail column when the rail runs two columns */
+  sideColumnSize?: number
 }
 
 export interface Room {
