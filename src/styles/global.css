@@ -268,33 +268,81 @@
   .rail {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 0;
     min-width: 0;
     min-height: 0;
   }
 
   .rail-slot {
     flex: 1 1 0;
-    min-height: 120px;
-    /*display: flex;*/
+    min-height: 96px;
+    min-width: 0;
   }
 
   .splitter {
     flex: none;
-    width: 12px;
-    cursor: col-resize;
     position: relative;
     border: none;
     background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    outline: none;
+    touch-action: none;
   }
 
   .splitter::after {
     content: "";
     position: absolute;
-    inset: 0 5px;
     border-radius: 99px;
     background: var(--app-border);
     transition: background 120ms ease;
+  }
+
+  .splitter--vertical {
+    width: 12px;
+    cursor: col-resize;
+  }
+
+  .splitter--vertical::after {
+    inset: 0 5px;
+  }
+
+  .splitter--horizontal {
+    height: 12px;
+    cursor: row-resize;
+  }
+
+  .splitter--horizontal::after {
+    inset: 5px 0;
+  }
+
+  /* Grip dots hint that the bar is draggable. */
+  .splitter-grip {
+    position: relative;
+    z-index: 1;
+    border-radius: 99px;
+    background: var(--app-text-muted, #94a3b8);
+    opacity: 0;
+    transition: opacity 120ms ease;
+  }
+
+  .splitter--vertical .splitter-grip {
+    width: 2px;
+    height: 22px;
+    box-shadow: -3px 0 0 var(--app-text-muted, #94a3b8), 3px 0 0 var(--app-text-muted, #94a3b8);
+  }
+
+  .splitter--horizontal .splitter-grip {
+    width: 22px;
+    height: 2px;
+    box-shadow: 0 -3px 0 var(--app-text-muted, #94a3b8), 0 3px 0 var(--app-text-muted, #94a3b8);
+  }
+
+  .splitter:hover .splitter-grip,
+  .splitter:focus-visible .splitter-grip,
+  .splitter--active .splitter-grip {
+    opacity: 0.9;
   }
 
   .splitter:hover::after,
